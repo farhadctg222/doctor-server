@@ -1,6 +1,10 @@
 const express = require('express')
 const cors = require('cors')
 const app =express()
+const jwt = require('jsonwebtoken');
+require('dotenv').config()
+const cookieParser = require( 'cookie-parser')
+
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = "mongodb+srv://doctor:MI6UlA1ARPCILMyX@cluster0.cgsbnjt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
@@ -8,7 +12,11 @@ const uri = "mongodb+srv://doctor:MI6UlA1ARPCILMyX@cluster0.cgsbnjt.mongodb.net/
 
 const port = process.env.port || 5000;
  
-app.use(cors())
+app.use(cors({
+  origin: ['http://localhost:5173'],
+  credentials: true
+}))
+app.use(cookieParser())
 app.use(express.json())
 
 app.get('/',(req,res)=>{
@@ -27,6 +35,15 @@ const client = new MongoClient(uri, {
   }
 });
 
+const loger = (req,res,next)=>{
+  console.log('cald',req.host,req.post)
+  console.log(req.body.cookie.token)
+  next()
+}
+const verify = (req,res,nex)=>{
+
+}
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -35,7 +52,7 @@ async function run() {
       const db = client.db('Doctor').collection('service')
       const order = client.db('ServiceData').collection('Order')
       
-      app.get('/service',async(req,res)=>{
+      app.get('/service',loger,async(req,res)=>{
         const curson = db.find()
         const data = await curson.toArray()
         res.send(data)
@@ -52,14 +69,14 @@ async function run() {
         res.send(result)
       });
 
-    app.post('/booking',async(req,res)=>{
+    app.post('/booking',loger,async(req,res)=>{
       const booking = req.body;
       console.log(booking)
       const result = await order.insertOne(booking)
       res.send(result)
     })
 
-    app.get('/book',async (req,res)=>{
+    app.get('/book',loger,async (req,res)=>{
         console.log(req.query.email)
         let query = {}
         if(req.query?.email){
@@ -75,7 +92,7 @@ async function run() {
       const result = await order.deleteOne(query)
       res.send(result)
     }),
-    app.patch('/bookings/:id',async(req,res)=>{
+    app.patch('/bookings/:id',loger,async(req,res)=>{
       const id = req.params.id;
       const filter = {_id : new ObjectId(id)}
       const updateBooking = req.body;
@@ -89,6 +106,21 @@ async function run() {
       res.send(result)
     })
 
+    app.post('/jwt',async (req,res)=>{
+      const id = req.body
+      
+      const token = jwt.sign(id,process.env.ACCESS_TOKEN, {expiresIn: '1h' })
+      
+      console.log(token)
+      res.cookie('token',token,{
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none'
+      })
+      
+      res.send({success: true})
+    })
+
 
   
     await client.db("admin").command({ ping: 1 });
@@ -99,6 +131,7 @@ async function run() {
   }
 }
 run().catch(console.dir);
+
 
 
 
